@@ -8,13 +8,27 @@ use ReflectionClass;
 
 abstract class AbstractModel implements Configurable, Exportable
 {
-    use ConfigureTrait;
-
-    const DATE_EXPORT_FORMAT = 'Y-m-d H:i:s';
+    public const DATE_EXPORT_FORMAT = 'Y-m-d H:i:s';
 
     public function __construct(array $config = [])
     {
         $this->configure($config);
+    }
+
+    public function configure(array $config)
+    {
+        foreach ($config as $key => $value) {
+            $propertyName = Inflector::camelize($key);
+            $customSetter = 'set' . ucfirst($propertyName);
+            if (method_exists($this, $customSetter)) {
+                call_user_func([$this, $customSetter], $value);
+                continue;
+            }
+
+            if (property_exists($this, $propertyName)) {
+                $this->{$propertyName} = $value;
+            }
+        }
     }
 
     public function export(): array
@@ -24,21 +38,14 @@ abstract class AbstractModel implements Configurable, Exportable
 
         $result = [];
         foreach ($reflectionProperties as $reflectionProperty) {
-            $propertyName = Inflector::tableize($reflectionProperty->getName());
-            $customGetter = 'get' . ucfirst($propertyName);
+            $customGetter = 'get' . ucfirst($reflectionProperty->getName());
             if (method_exists($this, $customGetter)) {
                 $propertyValue = call_user_func([$this, $customGetter]);
             } else {
                 $propertyValue = $this->{$reflectionProperty->getName()};
             }
 
-            $propertyValue = $this->exportValue($propertyValue);
-
-            if (is_array($propertyValue)) {
-                $propertyName = Inflector::singularize($propertyName);
-            }
-
-            $result[$propertyName] = $propertyValue;
+            $result[$this->exportName($reflectionProperty->getName())] = $this->exportValue($propertyValue);
         }
 
         return $result;
@@ -59,9 +66,14 @@ abstract class AbstractModel implements Configurable, Exportable
         }
 
         if ($propertyValue instanceof DateTime) {
-            return $propertyValue->format(self::DATE_EXPORT_FORMAT);
+            return $propertyValue->format(static::DATE_EXPORT_FORMAT);
         }
 
         return $propertyValue;
+    }
+
+    protected function exportName(string $name): string
+    {
+        return Inflector::tableize($name);
     }
 }
