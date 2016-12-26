@@ -45,7 +45,17 @@ abstract class AbstractModel implements Configurable, Exportable
                 $propertyValue = $this->{$reflectionProperty->getName()};
             }
 
-            $result[$this->exportName($reflectionProperty->getName())] = $this->exportValue($propertyValue);
+            $customExporter = 'export' . ucfirst($reflectionProperty->getName());
+            if (method_exists($this, $customExporter)) {
+                list($propertyName, $propertyValue) = call_user_func([$this, $customExporter]);
+
+                if ($propertyValue instanceof SkipExport) {
+                    continue;
+                }
+                $result[$propertyName] = $propertyValue;
+            } else {
+                $result[$this->exportName($reflectionProperty->getName())] = $this->exportValue($propertyValue);
+            }
         }
 
         return $result;
