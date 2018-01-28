@@ -4,5 +4,8 @@ namespace Gietos\Model;
 
 interface Configurable
 {
-    function configure(array $config);
+    /**
+     * @param string|array $config
+     */
+    public function configure($config);
 }
